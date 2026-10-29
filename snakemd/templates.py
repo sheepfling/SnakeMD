@@ -199,7 +199,7 @@ class Checklist(Template):
                 f"{self._checked}"
             )
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Renders the checklist as a markdown string. Checklists
         function very similarly to unorded lists, but require
@@ -285,7 +285,11 @@ class CSVTable(Template):
         the encoding of the CSV file; defaults to utf-8
     """
 
-    def __init__(self, path: os.PathLike, encoding: str = "utf-8") -> None:
+    def __init__(
+        self,
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        encoding: str = "utf-8",
+    ) -> None:
         super().__init__()
         self._path = path
         self._encoding = encoding
@@ -312,7 +316,9 @@ class CSVTable(Template):
         return repr(self._table)
 
     @staticmethod
-    def _process_csv(path: os.PathLike, encoding: str) -> Table:
+    def _process_csv(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes], encoding: str
+    ) -> Table:
         """
         A helper method for processing the CSV file into
         a Table object.

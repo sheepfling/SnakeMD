@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import Iterable
+from typing import Iterable, Iterator as _Iterator, Protocol as _Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +239,7 @@ class Inline(Element):
         """
         return self._text
 
-    def get_link(self) -> str:
+    def get_link(self) -> str | None:
         """
         Retrieves the link attribute of the Inline element.
 
@@ -253,7 +253,7 @@ class Inline(Element):
             Included to avoid protected member access scenarios.
 
         :return:
-            the link of the Inline element
+            the link of the Inline element, or None if it has no link
         """
         return self._link
 
@@ -526,7 +526,7 @@ class Code(Block):
         the programming language for the code block; defaults to 'generic'
     """
 
-    def __init__(self, code: str | Code, lang: str = "generic"):
+    def __init__(self, code: str | Code, lang: str = "generic") -> None:
         self._code = code
         self._lang = lang
         self._backticks = self._process_backticks(code)
@@ -573,7 +573,7 @@ class Code(Block):
         """
         return f"Code(code={self._code!r}, lang={self._lang!r})"
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         """
         Checks to see if this code block is equal to some
         other object. Equality is based on the provided
@@ -859,7 +859,7 @@ class MDList(Block):
     ) -> None:
         self._items: list[Block] = self._process_items(items)
         self._ordered: bool = ordered
-        self._checked: bool | list[bool] = (
+        self._checked: None | bool | list[bool] = (
             checked if checked is None or isinstance(checked, bool) else list(checked)
         )
         self._space = ""
@@ -1026,7 +1026,7 @@ class Paragraph(Block):
           styling, etc.)
     """
 
-    def __init__(self, content: str | Iterable[str | Inline]):
+    def __init__(self, content: str | Iterable[str | Inline]) -> None:
         self._content: list[Inline] = self._process_content(content)
 
     def __str__(self) -> str:
@@ -1372,6 +1372,14 @@ class Raw(Block):
         return f"Raw(text={self._text!r})"
 
 
+class _TableRow(_Protocol):
+    """A row must be iterable and have a length."""
+
+    def __iter__(self) -> _Iterator[str | Inline | Paragraph]: ...
+
+    def __len__(self) -> int: ...
+
+
 class Table(Block):
     """
     A table is a standalone block of rows and columns. Data is rendered
@@ -1408,7 +1416,7 @@ class Table(Block):
     def __init__(
         self,
         header: Iterable[str | Inline | Paragraph],
-        body: Iterable[Iterable[str | Inline | Paragraph]] = None,
+        body: Iterable[Iterable[str | Inline | Paragraph]] | None = None,
         align: None | Iterable[Align] = None,
         indent: int = 0,
     ) -> None:
@@ -1483,7 +1491,7 @@ class Table(Block):
     @staticmethod
     def _process_table(
         header, body
-    ) -> tuple(list[Paragraph], list[list[Paragraph]], list[int]):
+    ) -> tuple[list[Paragraph], list[list[Paragraph]]]:
         """
         Processes the table inputs to ensure header and body only contain paragraph
         blocks.
@@ -1542,7 +1550,7 @@ class Table(Block):
                     widths[i] = width
         return widths
 
-    def add_row(self, row: Iterable[str | Inline | Paragraph]) -> Table:
+    def add_row(self, row: _TableRow) -> Table:
         """
         A convenience method which adds a row to the end of table.
         Use this method to build a table row-by-row rather than constructing
@@ -1565,7 +1573,7 @@ class Table(Block):
 
         :raises ValueError:
             when row is not the same width as the table header
-        :param Iterable[str | Inline | Paragraph] row:
+        :param row:
             a row of data
         :return:
             self

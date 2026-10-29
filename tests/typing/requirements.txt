@@ -1,0 +1,4 @@
+# Tools for the isolated installed-wheel consumer check (not runtime dependencies).
+build>=1,<2
+mypy>=1.10,<3
+poetry-core>=2,<3

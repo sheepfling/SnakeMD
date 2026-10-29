@@ -61,7 +61,7 @@ class Document:
             Included to make __repr__ more useful
     """
 
-    def __init__(self, elements: list[Element] = None) -> None:
+    def __init__(self, elements: list[Element] | None = None) -> None:
         self._elements: list[Element] = elements or []
         logger.debug("Created new document: %r", self)
 
@@ -297,7 +297,7 @@ class Document:
         self,
         header: Iterable[str],
         data: Iterable[Iterable[str]],
-        align: Iterable[Table.Align] = None,
+        align: Iterable[Table.Align] | None = None,
         indent: int = 0,
     ) -> Table:
         """
@@ -336,7 +336,9 @@ class Document:
         logger.debug("Added table to document: %r", table)
         return table
 
-    def add_table_from_csv(self, path: os.PathLike) -> CSVTable:
+    def add_table_from_csv(
+        self, path: str | bytes | os.PathLike[str] | os.PathLike[bytes]
+    ) -> CSVTable:
         """
         A convenience method which adds a table from a CSV file to
         the document:
@@ -511,7 +513,7 @@ class Document:
     def dump(
         self,
         name: str,
-        directory: str | os.PathLike = "",
+        directory: str | os.PathLike[str] = "",
         ext: str = "md",
         encoding: str = "utf-8",
     ) -> None:
