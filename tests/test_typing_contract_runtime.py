@@ -38,7 +38,7 @@ def test_csv_paths_accept_strings_and_path_objects(tmp_path):
         assert "cell" in str(Document().add_table_from_csv(value))
 
 
-def test_table_add_row_requires_sized_iterable():
+def test_table_add_row_accepts_iterables_and_validates_materialized_width():
     class SizedRow:
         def __iter__(self):
             return iter(("custom",))
@@ -53,8 +53,12 @@ def test_table_add_row_requires_sized_iterable():
     assert not isinstance(row, Sequence)
     table.add_row(row)
     assert "custom" in str(table)
-    with pytest.raises(TypeError):
-        table.add_row(iter(["cell"]))
+    table.add_row(iter(["generator"]))
+    assert "generator" in str(table)
+    before = str(table)
+    with pytest.raises(ValueError, match="width 2"):
+        table.add_row(iter(["too", "many"]))
+    assert str(table) == before
 
 
 def test_dump_directory_accepts_string_and_path(tmp_path):

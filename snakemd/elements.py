@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import Iterable, Iterator as _Iterator, Protocol as _Protocol, cast as _cast
+from typing import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -526,7 +526,7 @@ class Code(Block):
         the programming language for the code block; defaults to 'generic'
     """
 
-    def __init__(self, code: str | Code, lang: str = "generic") -> None:
+    def __init__(self, code: str | Code, lang: str = "generic"):
         self._code = code
         self._lang = lang
         self._backticks = self._process_backticks(code)
@@ -859,7 +859,7 @@ class MDList(Block):
     ) -> None:
         self._items: list[Block] = self._process_items(items)
         self._ordered: bool = ordered
-        self._checked: None | bool | list[bool] = (
+        self._checked: bool | list[bool] | None = (
             checked if checked is None or isinstance(checked, bool) else list(checked)
         )
         self._space = ""
@@ -1026,7 +1026,7 @@ class Paragraph(Block):
           styling, etc.)
     """
 
-    def __init__(self, content: str | Iterable[str | Inline]) -> None:
+    def __init__(self, content: str | Iterable[str | Inline]):
         self._content: list[Inline] = self._process_content(content)
 
     def __str__(self) -> str:
@@ -1371,14 +1371,6 @@ class Raw(Block):
         return f"Raw(text={self._text!r})"
 
 
-class _TableRow(_Protocol):
-    """A row must be iterable and have a length; indexing is not required."""
-
-    def __iter__(self) -> _Iterator[str | Inline | Paragraph]: ...
-
-    def __len__(self) -> int: ...
-
-
 class Table(Block):
     """
     A table is a standalone block of rows and columns. Data is rendered
@@ -1421,10 +1413,8 @@ class Table(Block):
     ) -> None:
         logger.debug("Initializing table: (%r, %r, %r)", header, body, align)
         self._header: list[Paragraph]
-        self._header, initial_body = self._process_table(header, body or [])
-        # Initial cells are Paragraphs, but add_row also stores strings and Inline
-        # elements. The newly created body has no other references.
-        self._body = _cast(list[list[str | Inline | Paragraph]], initial_body)
+        self._body: list[list[str | Inline | Paragraph]]
+        self._header, self._body = self._process_table(header, body or [])
         if len(self._body) > 1 and not all(
             len(self._body[0]) == len(x) for x in self._body[1:]
         ):
@@ -1492,7 +1482,7 @@ class Table(Block):
     @staticmethod
     def _process_table(
         header, body
-    ) -> tuple[list[Paragraph], list[list[Paragraph]]]:
+    ) -> tuple[list[Paragraph], list[list[str | Inline | Paragraph]]]:
         """
         Processes the table inputs to ensure header and body only contain paragraph
         blocks.
@@ -1507,7 +1497,7 @@ class Table(Block):
             the processed header and body, containing only Paragraph blocks
         """
         processed_header = []
-        processed_body: list[list[Paragraph]] = []
+        processed_body: list[list[str | Inline | Paragraph]] = []
 
         # Process header
         for item in header:
@@ -1519,7 +1509,7 @@ class Table(Block):
 
         # Process body
         for row in body:
-            processed_row: list[Paragraph] = []
+            processed_row: list[str | Inline | Paragraph] = []
             for item in row:
                 if isinstance(item, (str, Inline)):
                     processed_row.append(Paragraph([item]))
@@ -1550,7 +1540,7 @@ class Table(Block):
                     widths[i] = width
         return widths
 
-    def add_row(self, row: _TableRow) -> Table:
+    def add_row(self, row: Iterable[str | Inline | Paragraph]) -> Table:
         """
         A convenience method which adds a row to the end of table.
         Use this method to build a table row-by-row rather than constructing
@@ -1573,10 +1563,8 @@ class Table(Block):
 
         :raises ValueError:
             when row is not the same width as the table header
-        :raises TypeError:
-            when row does not have a length
-        :param row:
-            a sized iterable of cells; indexing is not required
+        :param Iterable[str | Inline | Paragraph] row:
+            an iterable of cells
         :return:
             self
         """
@@ -1586,7 +1574,7 @@ class Table(Block):
         logger.debug("Adding row to table: %r", row_list)
 
         # Verify that it's safe to add
-        if len(row) != len(self._header):
+        if len(row_list) != len(self._header):
             raise ValueError(
                 f"Unable to add row with width {len(row_list)} "
                 f"to table with header of width {len(self._header)}"

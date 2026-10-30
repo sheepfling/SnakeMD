@@ -5,4 +5,4 @@ from snakemd import Inline, Table
 link: str = Inline("unlinked").get_link()
 Inline(123)
 
-Table(["head"]).add_row(cell for cell in ["generator"])
+Table(["head"]).add_row(123)

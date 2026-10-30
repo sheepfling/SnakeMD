@@ -38,6 +38,7 @@ def use_api(csv: Path, output: Path) -> None:
     table.add_row(["list"])
     table.add_row(("tuple",))
     table.add_row(SizedRow())
+    table.add_row(cell for cell in ["generator"])
     doc.add_table_from_csv(csv)
     doc.add_table_from_csv(str(csv))
     CSVTable(csv)
