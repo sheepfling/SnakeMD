@@ -1269,6 +1269,7 @@ class Quote(Block):
     """
 
     def __init__(self, content: str | Iterable[str | Inline | Block]) -> None:
+        # Alert can pass an iterable message as a single nested item (issue #191).
         self._lines: list[object] = self._process_content(content)
         self._depth = 1
 
