@@ -336,9 +336,7 @@ class Document:
         logger.debug("Added table to document: %r", table)
         return table
 
-    def add_table_from_csv(
-        self, path: str | bytes | os.PathLike[str] | os.PathLike[bytes]
-    ) -> CSVTable:
+    def add_table_from_csv(self, path: str | os.PathLike) -> CSVTable:
         """
         A convenience method which adds a table from a CSV file to
         the document:

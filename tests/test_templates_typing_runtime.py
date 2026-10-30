@@ -2,12 +2,10 @@
 
 import pytest
 
-from snakemd import Alert, Heading, Inline, Paragraph, TableOfContents
+from snakemd import Alert, Heading, TableOfContents
 
 
-def test_alert_accepts_inline_and_retains_iterable_representation():
-    assert str(Alert(Inline("text"), Alert.Kind.NOTE)) == "> [!NOTE]\n> text"
-    assert str(Alert(Paragraph("text"), Alert.Kind.NOTE)) == "> [!NOTE]\n> text"
+def test_alert_retains_iterable_representation():
     assert str(Alert(["one", "two"], Alert.Kind.NOTE)) == (
         "> [!NOTE]\n> ['one', 'two']"
     )

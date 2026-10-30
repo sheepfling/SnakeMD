@@ -72,7 +72,7 @@ class Alert(Template):
         - IMPORTANT 
         - WARNING
         - CAUTION
-    :param str | Inline | Block | Iterable[str | Inline | Block] message:
+    :param str | Iterable[str | Inline | Block] message:
         the message you would like to show with the alert
     """
 
@@ -120,13 +120,20 @@ class Alert(Template):
 
     def __init__(
         self,
-        message: str | Inline | Block | Iterable[str | Inline | Block],
+        message: str | Iterable[str | Inline | Block],
         kind: Kind
     ) -> None:
         super().__init__()
         self._kind = kind
         self._message = message
-        self._alert = Quote([f"[!{self._kind.name}]", self._message])
+        # Alert has historically passed iterable messages as one quote item.
+        # Retain that rendering while keeping Quote's documented item types.
+        self._alert = Quote(
+            _cast(
+                Iterable[str | Inline | Block],
+                [f"[!{self._kind.name}]", self._message],
+            )
+        )
 
     def __str__(self) -> str:
         """
@@ -287,7 +294,7 @@ class CSVTable(Template):
 
     def __init__(
         self,
-        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        path: str | os.PathLike,
         encoding: str = "utf-8",
     ) -> None:
         super().__init__()
@@ -317,7 +324,7 @@ class CSVTable(Template):
 
     @staticmethod
     def _process_csv(
-        path: str | bytes | os.PathLike[str] | os.PathLike[bytes], encoding: str
+        path: str | os.PathLike, encoding: str
     ) -> Table:
         """
         A helper method for processing the CSV file into

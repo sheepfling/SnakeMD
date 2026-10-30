@@ -1,11 +1,6 @@
 """Behavior of element inputs that affect their type contracts."""
 
-from snakemd import Inline, Paragraph, Quote, Table
-
-
-def test_quote_stringifies_other_iterable_items():
-    quote = Quote([7, ["a", "b"], Inline("bold", bold=True)])
-    assert str(quote) == "> 7\n> ['a', 'b']\n> **bold**"
+from snakemd import Inline, Paragraph, Table
 
 
 def test_table_keeps_mixed_added_cells_and_renders_them():

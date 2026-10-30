@@ -1259,17 +1259,16 @@ class Quote(Block):
     A quote is a standalone block of emphasized text. Quotes can be
     nested and can contain other blocks.
 
-    :param str | Iterable[object] content:
+    :param str | Iterable[str | Inline | Block] content:
         the text to be formatted as a Markdown quote
 
         - set to a string to render a whitespace respected quote
           (similar to :class:`snakemd.Code`)
-        - set to a "list" of objects to render a document-like quote
-          (i.e., all items will be separated by newlines and non-block objects
-          are rendered as strings)
+        - set to a "list" of text objects to render a document-like quote
+          (i.e., all items will be separated by newlines)
     """
 
-    def __init__(self, content: str | Iterable[object]) -> None:
+    def __init__(self, content: str | Iterable[str | Inline | Block]) -> None:
         self._lines: list[object] = self._process_content(content)
         self._depth = 1
 
@@ -1322,9 +1321,7 @@ class Quote(Block):
     @staticmethod
     def _process_content(lines: str | Iterable[object]) -> list[object]:
         """
-        Converts the raw input lines to something that is
-        a bit easier to work with. Strings and inline elements are converted
-        to blocks; other objects are retained.
+        Converts strings and inline elements to blocks and retains other objects.
 
         :param lines:
             a "list" of text objects or a string
