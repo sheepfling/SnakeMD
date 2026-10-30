@@ -336,7 +336,7 @@ class Document:
         logger.debug("Added table to document: %r", table)
         return table
 
-    def add_table_from_csv(self, path: str | os.PathLike) -> CSVTable:
+    def add_table_from_csv(self, path: str | bytes | os.PathLike) -> CSVTable:
         """
         A convenience method which adds a table from a CSV file to
         the document:
@@ -353,8 +353,8 @@ class Document:
             | SnakeMD 0.12 - 0.15 | Yes  | Yes  | Yes | Yes |
             | SnakeMD < 0.12      |      | Yes  | Yes | Yes |
             
-        :param os.PathLike path:
-            a path to a CSV file
+        :param str | bytes | os.PathLike path:
+            a path to a CSV file, as a string, bytes, or path-like object
         :return:
             the :class:`Table` added to this Document
         """

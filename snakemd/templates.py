@@ -286,15 +286,15 @@ class CSVTable(Template):
         Included to showcase the possibilities of
         templates
 
-    :param os.Pathlike path:
-        the path to a CSV file
+    :param str | bytes | os.PathLike path:
+        the path to a CSV file, as a string, bytes, or path-like object
     :param str encoding:
         the encoding of the CSV file; defaults to utf-8
     """
 
     def __init__(
         self,
-        path: str | os.PathLike,
+        path: str | bytes | os.PathLike,
         encoding: str = "utf-8",
     ) -> None:
         super().__init__()
@@ -324,7 +324,7 @@ class CSVTable(Template):
 
     @staticmethod
     def _process_csv(
-        path: str | os.PathLike, encoding: str
+        path: str | bytes | os.PathLike, encoding: str
     ) -> Table:
         """
         A helper method for processing the CSV file into

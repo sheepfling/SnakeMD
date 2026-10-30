@@ -42,6 +42,8 @@ def use_api(csv: Path, output: Path) -> None:
     doc.add_table_from_csv(str(csv))
     CSVTable(csv)
     CSVTable(str(csv))
+    doc.add_table_from_csv(os.fsencode(csv))
+    CSVTable(os.fsencode(csv))
     doc.add_table_from_csv(BytesPath())
     doc.add_table_from_csv(StringPath())
     CSVTable(BytesPath())

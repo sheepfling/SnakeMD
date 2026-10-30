@@ -33,7 +33,7 @@ def test_csv_paths_accept_strings_and_path_objects(tmp_path):
         def __fspath__(self) -> str:
             return str(path)
 
-    for value in (path, str(path), StringPath(), BytesPath()):
+    for value in (path, str(path), os.fsencode(path), StringPath(), BytesPath()):
         assert "cell" in str(CSVTable(value))
         assert "cell" in str(Document().add_table_from_csv(value))
 
