@@ -1,12 +1,14 @@
 """Build distributions and check a consumer against an isolated installed wheel.
 
-Run with Python 3.10+ and the build, poetry-core, and mypy packages installed:
+Run with Python 3.10+ and the tools in tests/typing/requirements.txt installed:
     python tests/check_installed_typing.py
 """
 
 from __future__ import annotations
 
+import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -77,33 +79,63 @@ def main() -> None:
             shutil.copy(ROOT / "tests" / "typing" / name, work / name)
         config = work / "mypy.ini"
         config.write_text("[mypy]\n", encoding="utf-8")
-        common = (
-            sys.executable,
-            "-m",
-            "mypy",
-            "--strict",
-            "--no-incremental",
-            "--config-file",
-            str(config),
-            "--python-executable",
-            str(python),
-        )
-        run(*common, "consumer.py", cwd=work, env=env)
-        negative = subprocess.run(
-            (*common, "negative.py"), cwd=work, env=env, text=True, capture_output=True
-        )
-        assert negative.returncode != 0, "negative consumer unexpectedly passed"
-        assert "Incompatible types in assignment" in negative.stdout, negative.stdout
-        assert 'Argument 1 to "Inline" has incompatible type' in negative.stdout, (
-            negative.stdout
-        )
-        assert (
-            'Argument 1 to "add_row" of "Table" has incompatible type'
-            in negative.stdout
-        ), negative.stdout
-        print(
-            "Wheel and sdist include py.typed; isolated wheel consumer checks passed."
-        )
+        # Each checker resolves imports from the clean wheel-only environment,
+        # while its own tools live outside that environment.
+        checkers = {
+            "mypy": (
+                sys.executable, "-m", "mypy", "--strict", "--no-incremental",
+                "--config-file", str(config), "--python-executable", str(python),
+            ),
+            "pyright": (
+                sys.executable, "-m", "pyright", "--outputjson",
+                "--pythonpath", str(python),
+            ),
+            "ty": (
+                sys.executable, "-m", "ty", "check", "--output-format", "concise",
+                "--color", "never", "--error-on-warning", "--python", str(python),
+            ),
+        }
+        negative_lines = [
+            line for line, text in enumerate((work / "negative.py").read_text().splitlines(), 1)
+            if 'link: str =' in text or 'Inline(123)' in text or '.add_row(' in text
+        ]
+        assert len(negative_lines) == 3, "negative fixture must exercise three errors"
+        for name, command in checkers.items():
+            run(*command, "consumer.py", cwd=work, env=env)
+            negative = subprocess.run(
+                (*command, "negative.py"), cwd=work, env=env,
+                text=True, capture_output=True,
+            )
+            assert negative.returncode != 0, f"{name}: negative consumer unexpectedly passed"
+            if name == "pyright":
+                result = json.loads(negative.stdout)
+                errors = {
+                    (item["range"]["start"]["line"] + 1, item.get("rule"))
+                    for item in result["generalDiagnostics"]
+                    if item["severity"] == "error"
+                }
+                rules = ("reportAssignmentType", "reportArgumentType", "reportArgumentType")
+            elif name == "mypy":
+                errors = {
+                    (int(line), code) for line, code in re.findall(
+                        r"negative\.py:(\d+): .*?\[([a-z-]+)\]", negative.stdout
+                    )
+                }
+                rules = ("assignment", "arg-type", "arg-type")
+            else:
+                errors = {
+                    (int(line), code) for line, code in re.findall(
+                        r"negative\.py:(\d+):\d+: error\[([a-z-]+)\]", negative.stdout
+                    )
+                }
+                rules = ("invalid-assignment", "invalid-argument-type", "invalid-argument-type")
+            expected = set(zip(negative_lines, rules))
+            assert expected <= errors, (
+                f"{name}: missing expected errors {expected - errors}\n"
+                f"stdout: {negative.stdout}\nstderr: {negative.stderr}"
+            )
+            print(f"{name}: installed-wheel consumer checks passed")
+        print("Wheel and sdist include py.typed.")
 
 
 if __name__ == "__main__":

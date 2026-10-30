@@ -33,11 +33,14 @@ jobs:
 
     - name: Install typing verification tools
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-      run: python -m pip install -r tests/typing/requirements.txt
+      run: |
+        python -m venv "$RUNNER_TEMP/snakemd-typing-tools"
+        "$RUNNER_TEMP/snakemd-typing-tools/bin/python" -m pip install -r tests/typing/requirements.txt
 
     - name: Check typing in installed distributions
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-      run: python tests/check_installed_typing.py
+      run: |
+        "$RUNNER_TEMP/snakemd-typing-tools/bin/python" tests/check_installed_typing.py
 
     - name: PyTest
       run: poetry run coverage run -m pytest

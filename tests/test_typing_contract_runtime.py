@@ -1,6 +1,7 @@
 """Runtime behavior underlying the public type annotations."""
 
 import os
+from collections.abc import Sequence
 
 import pytest
 
@@ -28,15 +29,30 @@ def test_csv_paths_accept_strings_and_path_objects(tmp_path):
         def __fspath__(self) -> bytes:
             return os.fsencode(path)
 
-    for value in (path, str(path), os.fsencode(path), BytesPath()):
+    class StringPath(os.PathLike[str]):
+        def __fspath__(self) -> str:
+            return str(path)
+
+    for value in (path, str(path), os.fsencode(path), StringPath(), BytesPath()):
         assert "cell" in str(CSVTable(value))
         assert "cell" in str(Document().add_table_from_csv(value))
 
 
 def test_table_add_row_requires_sized_iterable():
+    class SizedRow:
+        def __iter__(self):
+            return iter(("custom",))
+
+        def __len__(self):
+            return 1
+
     table = Table(["header"])
     table.add_row(("cell",))
     assert "cell" in str(table)
+    row = SizedRow()
+    assert not isinstance(row, Sequence)
+    table.add_row(row)
+    assert "custom" in str(table)
     with pytest.raises(TypeError):
         table.add_row(iter(["cell"]))
 

@@ -1373,7 +1373,7 @@ class Raw(Block):
 
 
 class _TableRow(_Protocol):
-    """A row must be iterable and have a length."""
+    """A row must be iterable and have a length; indexing is not required."""
 
     def __iter__(self) -> _Iterator[str | Inline | Paragraph]: ...
 
@@ -1573,8 +1573,10 @@ class Table(Block):
 
         :raises ValueError:
             when row is not the same width as the table header
+        :raises TypeError:
+            when row does not have a length
         :param row:
-            a row of data
+            a sized iterable of cells; indexing is not required
         :return:
             self
         """
