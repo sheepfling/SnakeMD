@@ -21,7 +21,8 @@ def test_optional_document_and_table_arguments():
     assert Document().add_table(["header"], [["cell"]], align=None)
 
 
-def test_csv_paths_accept_strings_and_path_objects(tmp_path):
+def test_csv_paths_already_accept_strings_bytes_and_pathlike(tmp_path):
+    """These path forms also work in the released SnakeMD 2.4.1 runtime."""
     path = tmp_path / "sample.csv"
     path.write_text("header\ncell\n", encoding="utf-8")
 
@@ -68,6 +69,18 @@ def test_dump_directory_accepts_string_and_path(tmp_path):
     doc.dump("string", directory=str(tmp_path))
     assert (tmp_path / "path.md").read_text(encoding="utf-8") == "text"
     assert (tmp_path / "string.md").read_text(encoding="utf-8") == "text"
+
+
+def test_dump_directory_rejects_bytes_paths(tmp_path):
+    """Unlike CSV loading, dump rejects bytes paths in SnakeMD 2.4.1."""
+
+    class BytesPath(os.PathLike[bytes]):
+        def __fspath__(self) -> bytes:
+            return os.fsencode(tmp_path)
+
+    for directory in (os.fsencode(tmp_path), BytesPath()):
+        with pytest.raises(TypeError):
+            Document().dump("bytes", directory=directory)
 
 
 def test_other_annotated_public_methods():
