@@ -9,7 +9,7 @@ import csv
 import logging
 import os
 import re
-from typing import Iterable
+from typing import Iterable, cast as _cast
 from enum import Enum, auto
 
 from .elements import Block, Element, Heading, Inline, MDList, Quote, Table
@@ -43,7 +43,7 @@ class Template(Element):  # pylint: disable=too-few-public-methods
     """
 
     def __init__(self) -> None:
-        self._elements: list[Element] = None  # DO NOT MODIFY
+        self._elements: list[Element] | None = None  # DO NOT MODIFY
 
     def load(self, elements: list[Element]) -> None:
         """
@@ -72,7 +72,7 @@ class Alert(Template):
         - IMPORTANT 
         - WARNING
         - CAUTION
-    :param str | Iterable[str | Inline | Block] message:
+    :param str | Inline | Block | Iterable[str | Inline | Block] message:
         the message you would like to show with the alert
     """
 
@@ -120,7 +120,7 @@ class Alert(Template):
 
     def __init__(
         self,
-        message: str | Iterable[str | Inline | Block],
+        message: str | Inline | Block | Iterable[str | Inline | Block],
         kind: Kind
     ) -> None:
         super().__init__()
@@ -392,9 +392,12 @@ class TableOfContents(Template):
         :return:
             a list heading objects
         """
+        # Templates are expected to be loaded before rendering.  This cast leaves
+        # the existing TypeError for an unloaded template unchanged.
+        elements = _cast(list[Element], self._elements)
         return [
             heading
-            for heading in self._elements
+            for heading in elements
             if isinstance(heading, Heading) and heading.get_level() in self._levels
         ]
 
@@ -412,7 +415,7 @@ class TableOfContents(Template):
 
         i = position
         level = headings[i].get_level()
-        table_of_contents = []
+        table_of_contents: list[Inline | MDList] = []
         while i < len(headings) and headings[i].get_level() >= level:
             heading_text: str = headings[i].get_text()
             heading_level: int = headings[i].get_level()

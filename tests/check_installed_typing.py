@@ -6,6 +6,7 @@ Run with Python 3.10+ and the tools in tests/typing/requirements.txt installed:
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -26,6 +27,14 @@ def run(*args: str, cwd: Path, env: dict[str, str]) -> subprocess.CompletedProce
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--python",
+        default=sys.executable,
+        help="target Python interpreter (defaults to the checker interpreter)",
+    )
+    requested_python = parser.parse_args().python
+    target_python = os.path.abspath(shutil.which(requested_python) or requested_python)
     env = os.environ.copy()
     for name in ("PYTHONPATH", "MYPYPATH", "PYTHONHOME"):
         env.pop(name, None)
@@ -52,7 +61,7 @@ def main() -> None:
             ), "sdist lacks py.typed"
 
         venv = work / "venv"
-        run(sys.executable, "-m", "venv", str(venv), cwd=work, env=env)
+        run(target_python, "-m", "venv", str(venv), cwd=work, env=env)
         python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
         run(
             str(python),
@@ -75,38 +84,135 @@ def main() -> None:
             env=env,
         )
 
-        for name in ("consumer.py", "negative.py"):
+        for name in ("consumer.py", "negative.py", "public_api.py"):
             shutil.copy(ROOT / "tests" / "typing" / name, work / name)
+        (work / "input.csv").write_text("header\ncell\n", encoding="utf-8")
+        run(
+            str(python),
+            "-c",
+            "from pathlib import Path; from public_api import exercise_public_api; "
+            "exercise_public_api(Path('input.csv'), Path('.'))",
+            cwd=work,
+            env=env,
+        )
+        version = subprocess.check_output(
+            [
+                str(python),
+                "-c",
+                "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')",
+            ],
+            cwd=work,
+            env=env,
+            text=True,
+        ).strip()
         config = work / "mypy.ini"
         config.write_text("[mypy]\n", encoding="utf-8")
         # Each checker resolves imports from the clean wheel-only environment,
         # while its own tools live outside that environment.
         checkers = {
             "mypy": (
-                sys.executable, "-m", "mypy", "--strict", "--no-incremental",
-                "--config-file", str(config), "--python-executable", str(python),
+                sys.executable,
+                "-m",
+                "mypy",
+                "--strict",
+                "--no-incremental",
+                "--cache-dir",
+                os.devnull,
+                "--config-file",
+                str(config),
+                "--python-version",
+                version,
+                "--python-executable",
+                str(python),
             ),
             "pyright": (
-                sys.executable, "-m", "pyright", "--outputjson",
-                "--pythonpath", str(python),
+                sys.executable,
+                "-m",
+                "pyright",
+                "--outputjson",
+                "--pythonversion",
+                version,
+                "--pythonpath",
+                str(python),
             ),
             "ty": (
-                sys.executable, "-m", "ty", "check", "--output-format", "concise",
-                "--color", "never", "--error-on-warning", "--python", str(python),
+                sys.executable,
+                "-m",
+                "ty",
+                "check",
+                "--output-format",
+                "concise",
+                "--color",
+                "never",
+                "--error-on-warning",
+                "--python-version",
+                version,
+                "--python",
+                str(python),
             ),
         }
+        # Check the source at the same target version, independently of the
+        # stricter installed-consumer fixtures below.
+        source_checks = {
+            "mypy": (
+                sys.executable,
+                "-m",
+                "mypy",
+                "--no-incremental",
+                "--cache-dir",
+                os.devnull,
+                "--config-file",
+                str(config),
+                "--python-version",
+                version,
+                "--python-executable",
+                str(python),
+            ),
+            "pyright": (
+                sys.executable,
+                "-m",
+                "pyright",
+                "--pythonversion",
+                version,
+                "--pythonpath",
+                str(python),
+            ),
+            "ty": (
+                sys.executable,
+                "-m",
+                "ty",
+                "check",
+                "--python-version",
+                version,
+                "--python",
+                str(python),
+                "--error-on-warning",
+            ),
+        }
+        for name, command in source_checks.items():
+            run(*command, str(ROOT / "snakemd"), cwd=ROOT, env=env)
+            print(f"{name}: source check passed for Python {version}")
         negative_lines = [
-            line for line, text in enumerate((work / "negative.py").read_text().splitlines(), 1)
-            if 'link: str =' in text or 'Inline(123)' in text or '.add_row(' in text
+            line
+            for line, text in enumerate(
+                (work / "negative.py").read_text().splitlines(), 1
+            )
+            if "link: str =" in text or "Inline(123)" in text or ".add_row(" in text
         ]
         assert len(negative_lines) == 3, "negative fixture must exercise three errors"
         for name, command in checkers.items():
             run(*command, "consumer.py", cwd=work, env=env)
+            run(*command, "public_api.py", cwd=work, env=env)
             negative = subprocess.run(
-                (*command, "negative.py"), cwd=work, env=env,
-                text=True, capture_output=True,
+                (*command, "negative.py"),
+                cwd=work,
+                env=env,
+                text=True,
+                capture_output=True,
             )
-            assert negative.returncode != 0, f"{name}: negative consumer unexpectedly passed"
+            assert (
+                negative.returncode != 0
+            ), f"{name}: negative consumer unexpectedly passed"
             if name == "pyright":
                 result = json.loads(negative.stdout)
                 errors = {
@@ -114,21 +220,31 @@ def main() -> None:
                     for item in result["generalDiagnostics"]
                     if item["severity"] == "error"
                 }
-                rules = ("reportAssignmentType", "reportArgumentType", "reportArgumentType")
+                rules = (
+                    "reportAssignmentType",
+                    "reportArgumentType",
+                    "reportArgumentType",
+                )
             elif name == "mypy":
                 errors = {
-                    (int(line), code) for line, code in re.findall(
+                    (int(line), code)
+                    for line, code in re.findall(
                         r"negative\.py:(\d+): .*?\[([a-z-]+)\]", negative.stdout
                     )
                 }
                 rules = ("assignment", "arg-type", "arg-type")
             else:
                 errors = {
-                    (int(line), code) for line, code in re.findall(
+                    (int(line), code)
+                    for line, code in re.findall(
                         r"negative\.py:(\d+):\d+: error\[([a-z-]+)\]", negative.stdout
                     )
                 }
-                rules = ("invalid-assignment", "invalid-argument-type", "invalid-argument-type")
+                rules = (
+                    "invalid-assignment",
+                    "invalid-argument-type",
+                    "invalid-argument-type",
+                )
             expected = set(zip(negative_lines, rules))
             assert expected <= errors, (
                 f"{name}: missing expected errors {expected - errors}\n"

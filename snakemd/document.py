@@ -329,9 +329,9 @@ class Document:
         :return:
             the :class:`Table` added to this Document
         """
-        header = [Paragraph([text]) for text in header]
-        data = [[Paragraph([item]) for item in row] for row in data]
-        table = Table(header, data, align, indent)
+        table_header = [Paragraph([text]) for text in header]
+        table_data = [[Paragraph([item]) for item in row] for row in data]
+        table = Table(table_header, table_data, align, indent)
         self._elements.append(table)
         logger.debug("Added table to document: %r", table)
         return table

@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import Iterable, Iterator as _Iterator, Protocol as _Protocol
+from typing import Iterable, Iterator as _Iterator, Protocol as _Protocol, cast as _cast
 
 logger = logging.getLogger(__name__)
 
@@ -649,8 +649,8 @@ class Heading(Block):
         :return:
             the heading as a markdown string
         """
-        heading = [str(item) for item in self._text]
-        heading = f"{'#' * self._level} {''.join(heading)}"
+        parts = [str(item) for item in self._text]
+        heading = f"{'#' * self._level} {''.join(parts)}"
         logger.debug("Rendered heading: %r", heading)
         return heading
 
@@ -961,7 +961,7 @@ class MDList(Block):
         :return:
             a list of Blocks
         """
-        processed = []
+        processed: list[Block] = []
         for item in items:
             if isinstance(item, (str, Inline)):
                 processed.append(Paragraph([item]))
@@ -1259,17 +1259,18 @@ class Quote(Block):
     A quote is a standalone block of emphasized text. Quotes can be
     nested and can contain other blocks.
 
-    :param str | Iterable[str | Inline | Block] content:
+    :param str | Iterable[object] content:
         the text to be formatted as a Markdown quote
 
         - set to a string to render a whitespace respected quote
           (similar to :class:`snakemd.Code`)
-        - set to a "list" of text objects to render a document-like quote
-          (i.e., all items will be separated by newlines)
+        - set to a "list" of objects to render a document-like quote
+          (i.e., all items will be separated by newlines and non-block objects
+          are rendered as strings)
     """
 
-    def __init__(self, content: str | Iterable[str | Inline | Block]) -> None:
-        self._lines: list[Block] = self._process_content(content)
+    def __init__(self, content: str | Iterable[object]) -> None:
+        self._lines: list[object] = self._process_content(content)
         self._depth = 1
 
     def __str__(self) -> str:
@@ -1319,17 +1320,18 @@ class Quote(Block):
         return f"Quote(content={self._lines!r})"
 
     @staticmethod
-    def _process_content(lines) -> list[Block]:
+    def _process_content(lines: str | Iterable[object]) -> list[object]:
         """
         Converts the raw input lines to something that is
-        a bit easier to work with. In this case, the lines
-        are converted to blocks.
+        a bit easier to work with. Strings and inline elements are converted
+        to blocks; other objects are retained.
 
         :param lines:
             a "list" of text objects or a string
         :return:
-            a list of Blocks
+            the processed objects
         """
+        processed_lines: list[object]
         if isinstance(lines, str):
             processed_lines = [Raw(lines)]
         else:
@@ -1422,8 +1424,10 @@ class Table(Block):
     ) -> None:
         logger.debug("Initializing table: (%r, %r, %r)", header, body, align)
         self._header: list[Paragraph]
-        self._body: list[list[Paragraph]]
-        self._header, self._body = self._process_table(header, body or [])
+        self._header, initial_body = self._process_table(header, body or [])
+        # Initial cells are Paragraphs, but add_row also stores strings and Inline
+        # elements. The newly created body has no other references.
+        self._body = _cast(list[list[str | Inline | Paragraph]], initial_body)
         if len(self._body) > 1 and not all(
             len(self._body[0]) == len(x) for x in self._body[1:]
         ):
@@ -1503,11 +1507,10 @@ class Table(Block):
         :param body:
             the table body in its various forms
         :return:
-            the table containing only Paragraph blocks and
-            a list of the widest items in each row
+            the processed header and body, containing only Paragraph blocks
         """
         processed_header = []
-        processed_body = []
+        processed_body: list[list[Paragraph]] = []
 
         # Process header
         for item in header:
@@ -1519,7 +1522,7 @@ class Table(Block):
 
         # Process body
         for row in body:
-            processed_row = []
+            processed_row: list[Paragraph] = []
             for item in row:
                 if isinstance(item, (str, Inline)):
                     processed_row.append(Paragraph([item]))
